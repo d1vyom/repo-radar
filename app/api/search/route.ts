@@ -1,41 +1,55 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { searchRepositories } from '@/lib/github/search';
-import { SearchFilters, SortOption } from '@/types/filters';
-import { GitHubApiError } from '@/lib/github/client';
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  
+  const q = searchParams.get('q') || '';
+  const language = searchParams.get('language') || '';
+  const stars = searchParams.get('stars') || '';
+  const sort = searchParams.get('sort') || 'stars';
+  const page = parseInt(searchParams.get('page') || '1', 10);
+
+  // Build the GitHub Search Query String
+  let query = q ? q : 'stars:>500'; // Default to popular repos if query is empty
+  
+  if (language) {
+    query += ` language:${language}`;
+  }
+  if (stars) {
+    query += ` stars:>=${stars}`;
+  }
 
   try {
-    // 1. Extract and validate parameters
-    const query = searchParams.get('q') || undefined;
-    const language = searchParams.get('language') || undefined;
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const sort = (searchParams.get('sort') as SortOption) || 'best-match';
+    // Determine sort order based on our dropdown parameters
+    let sortParam = 'stars-desc';
+    if (sort === 'stars') sortParam = 'stars-desc';
+    if (sort === 'forks') sortParam = 'forks-desc';
+    if (sort === 'updated') sortParam = 'updated-desc';
 
-    const filters: SearchFilters = {
-      query,
-      language,
-    };
+    const data = await searchRepositories(
+      { query }, 
+      sortParam as Parameters<typeof searchRepositories>[1], 
+      page, 
+      20
+    );
 
-    // 2. Execute GitHub Search securely on the server
-    const result = await searchRepositories(filters, sort, page);
-
-    // 3. Return successful payload
-    return NextResponse.json(result);
-
+    return NextResponse.json(data);
   } catch (error: unknown) {
-    if (error instanceof GitHubApiError) {
-      console.error('Search API Error:', error.message);
+    console.error('Search API Error:', error);
+    
+    // Safely cast the error to check its properties
+    const err = error as { message?: string; status?: number };
+    
+    if (err.message?.includes('rate limit') || err.status === 403) {
       return NextResponse.json(
-        { error: error.message, rateLimitRemaining: error.rateLimitRemaining },
-        { status: error.status }
+        { error: 'GitHub API rate limit exceeded. Please try again later.' }, 
+        { status: 429 }
       );
     }
-
-    console.error('Search API Error:', error instanceof Error ? error.message : 'Unknown error');
+    
     return NextResponse.json(
-      { error: 'Internal server error while fetching repositories.' },
+      { error: 'Failed to fetch search results.' }, 
       { status: 500 }
     );
   }
