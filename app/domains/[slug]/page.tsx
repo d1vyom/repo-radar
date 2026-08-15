@@ -3,6 +3,8 @@ import { RepositoryCard } from '@/components/repository-card';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DomainPage({ params }: { params: { slug: string } }) {
   // 1. Validate the domain exists
   const { data: domain } = await supabaseAdmin
