@@ -1,3 +1,4 @@
+import sanitizeHtml from 'sanitize-html';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -32,17 +33,36 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // 2. Main Page Component
 export default async function RepositoryDetailPage({ params }: PageProps) {
   let repo, readmeHtml, latestRelease;
+  let safeReadmeHtml = null;
 
   try {
-    // Fetch data in parallel for speed
+    // Add a strict timeout to parallel fetching to prevent hanging requests
+    const fetchWithTimeout = async <T,>(promise: Promise<T>): Promise<T> => {
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 8000));
+      return Promise.race([promise, timeout]);
+    };
+
     [repo, readmeHtml, latestRelease] = await Promise.all([
-      getRepository(params.owner, params.name),
-      getRepositoryReadme(params.owner, params.name),
-      getLatestRelease(params.owner, params.name)
+      fetchWithTimeout(getRepository(params.owner, params.name)),
+      fetchWithTimeout(getRepositoryReadme(params.owner, params.name)),
+      fetchWithTimeout(getLatestRelease(params.owner, params.name))
     ]);
+
+    // XSS Mitigation: Sanitize the GitHub HTML output
+    if (readmeHtml) {
+      safeReadmeHtml = sanitizeHtml(readmeHtml, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div']),
+        allowedAttributes: {
+          ...sanitizeHtml.defaults.allowedAttributes,
+          '*': ['class', 'id', 'align', 'dir'],
+          'img': ['src', 'alt', 'width', 'height', 'max-width']
+        },
+        allowedSchemes: ['http', 'https', 'mailto']
+      });
+    }
+
   } catch (error: unknown) {
     const err = error as Error;
-    // Handle specific API failures gracefully
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
         <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -50,6 +70,8 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
         <p className="text-muted-foreground">
           {err.message === 'RATE_LIMIT' 
             ? 'GitHub API rate limit exceeded. Please try again later.' 
+            : err.message === 'TIMEOUT'
+            ? 'The request took too long to complete.'
             : 'There was an error communicating with the GitHub API.'}
         </p>
       </div>
@@ -142,15 +164,13 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
           {/* README Preview */}
           <div className="bg-[#111111] border border-border/50 rounded-lg overflow-hidden">
             <div className="border-b border-border/50 bg-black/20 p-4">
-              <h2 className="font-semibold flex items-center gap-2">
-                README Preview
-              </h2>
+              <h2 className="font-semibold flex items-center gap-2">README Preview</h2>
             </div>
             <div className="p-6 md:p-8 overflow-x-auto">
-              {readmeHtml ? (
+              {safeReadmeHtml ? (
                 <article 
                   className="prose prose-invert max-w-none prose-img:rounded-lg prose-a:text-blue-400"
-                  dangerouslySetInnerHTML={{ __html: readmeHtml }}
+                  dangerouslySetInnerHTML={{ __html: safeReadmeHtml }} // Now mathematically safe
                 />
               ) : (
                 <p className="text-muted-foreground italic text-center py-8">

@@ -113,6 +113,7 @@ export default function SearchInterface() {
           <label className="block text-sm font-medium mb-2">Search</label>
           <input
             type="text"
+            aria-label="Search repositories"
             placeholder="Repository name..."
             className="w-full bg-[#111111] border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={searchTerm}
@@ -126,6 +127,7 @@ export default function SearchInterface() {
         <div>
           <label className="block text-sm font-medium mb-2">Language</label>
           <select
+            aria-label="Language"
             className="w-full bg-[#111111] border border-border rounded-md px-3 py-2 text-sm focus:outline-none"
             value={language}
             onChange={(e) => {
@@ -145,6 +147,7 @@ export default function SearchInterface() {
         <div>
           <label className="block text-sm font-medium mb-2">Minimum Stars</label>
           <select
+            aria-label="Minimum Stars"
             className="w-full bg-[#111111] border border-border rounded-md px-3 py-2 text-sm focus:outline-none"
             value={stars}
             onChange={(e) => {
@@ -162,6 +165,7 @@ export default function SearchInterface() {
         <div>
           <label className="block text-sm font-medium mb-2">Sort By</label>
           <select
+            aria-label="Sort By"
             className="w-full bg-[#111111] border border-border rounded-md px-3 py-2 text-sm focus:outline-none"
             value={sort}
             onChange={(e) => {
