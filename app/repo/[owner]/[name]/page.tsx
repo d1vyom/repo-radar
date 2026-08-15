@@ -6,6 +6,8 @@ import { getRepository, getRepositoryReadme, getLatestRelease } from '@/lib/gith
 import { Star, GitFork, Eye, AlertCircle, Clock, HardDrive, Shield, Terminal, ExternalLink, Archive, Tag } from 'lucide-react';
 import Image from 'next/image';
 
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   params: { owner: string; name: string };
 }
