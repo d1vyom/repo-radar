@@ -17,6 +17,7 @@ export interface GitHubRepository {
   html_url: string;
   description: string | null;
   fork: boolean;
+  clone_url: string;
   created_at: string;
   updated_at: string;
   pushed_at: string;
