@@ -106,3 +106,63 @@ export async function getRecentlyUpdated(limit = 10): Promise<RepositoryWithStat
     
   return data as unknown as RepositoryWithStats[] || [];
 }
+export async function getPopularByDomain(domainSlug: string, limit = 10): Promise<RepositoryWithStats[]> {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayString = yesterday.toISOString().split('T')[0];
+
+  // We perform an inner join through the repository_domains table
+  const { data, error } = await supabaseAdmin
+    .from('repositories')
+    .select(`
+      *,
+      repository_snapshots (
+        stars_count,
+        forks_count,
+        snapshot_date
+      ),
+      repository_domains!inner (
+        domains!inner (
+          slug
+        )
+      )
+    `)
+    .eq('repository_snapshots.snapshot_date', yesterdayString)
+    .eq('repository_domains.domains.slug', domainSlug);
+
+  if (error || !data) {
+    console.error(`Failed to fetch repos for domain ${domainSlug}:`, error?.message);
+    return [];
+  }
+
+  // Reuse our strict type casting logic from before
+  type JoinedRepo = RepositoryWithStats & {
+    repository_snapshots: { stars_count: number; forks_count: number; snapshot_date: string }[];
+  };
+
+  const typedData = data as unknown as JoinedRepo[];
+
+  const processedData: RepositoryWithStats[] = typedData.map((repo) => {
+    const snapshot = repo.repository_snapshots[0];
+    const starsGained24h = snapshot ? repo.stars_count - snapshot.stars_count : 0;
+    const forksGained24h = snapshot ? repo.forks_count - snapshot.forks_count : 0;
+    
+    const metrics: RepoMetrics = {
+      totalStars: repo.stars_count,
+      totalForks: repo.forks_count,
+      starsGained24h: Math.max(starsGained24h, 0),
+      forksGained24h: Math.max(forksGained24h, 0),
+      daysSinceLastPush: getDaysSince(repo.github_pushed_at),
+    };
+
+    return {
+      ...repo,
+      stars_gained_24h: metrics.starsGained24h,
+      trending_score: calculateTrendingScore(metrics),
+      is_hidden_gem: isHiddenGem(metrics)
+    };
+  });
+
+  return processedData.sort((a, b) => (b.trending_score || 0) - (a.trending_score || 0)).slice(0, limit);
+}
+

@@ -1,3 +1,4 @@
+import { classifyRepository } from '../classification/engine';
 import 'server-only';
 import { supabaseAdmin } from './server';
 import { GitHubRepository } from '@/lib/github/types';
@@ -68,6 +69,33 @@ export async function syncRepositoryToDatabase(repo: GitHubRepository): Promise<
     console.error(`Failed to insert snapshot for ${repo.full_name}:`, snapshotError.message);
     // We don't throw here to avoid failing the whole sync if just the snapshot fails
   }
+  // 4. Run Domain Classification
+  const classifications = classifyRepository(repo.description, repo.topics, repo.language);
+  
+  if (classifications.length > 0) {
+    // Fetch internal Domain UUIDs based on slugs
+    const slugs = classifications.map((c) => c.domainSlug);
+    const { data: domains } = await supabaseAdmin
+      .from('domains')
+      .select('id, slug')
+      .in('slug', slugs);
 
+    if (domains && domains.length > 0) {
+      // Create join table records
+      const domainLinks = domains.map((domain) => ({
+        repository_id: internalRepoId,
+        domain_id: domain.id
+      }));
+
+      // Upsert the relationships
+      const { error: linkError } = await supabaseAdmin
+        .from('repository_domains')
+        .upsert(domainLinks, { onConflict: 'repository_id, domain_id' });
+
+      if (linkError) {
+        console.error(`Failed to link domains for ${repo.full_name}:`, linkError.message);
+      }
+    }
+  }
   return internalRepoId;
 }

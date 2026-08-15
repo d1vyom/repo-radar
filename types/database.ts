@@ -91,6 +91,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      domains: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      repository_domains: {
+        Row: {
+          repository_id: string;
+          domain_id: string;
+        };
+        Insert: {
+          repository_id: string;
+          domain_id: string;
+        };
+        Update: {
+          repository_id?: string;
+          domain_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
