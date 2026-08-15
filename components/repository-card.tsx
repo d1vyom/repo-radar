@@ -37,7 +37,13 @@ export function RepositoryCard({ repo }: { repo: RepositoryWithStats }) {
               <TrendingUp className="mr-1 h-3.5 w-3.5" />
               +{repo.stars_gained_24h} today
             </div>
+            
           )}
+        </div>
+        <div className="mt-4 pt-4 border-t border-border/20">
+          <p className="text-xs text-muted-foreground">
+            Last synced: {new Date(repo.last_synced_at).toLocaleDateString()}
+          </p>
         </div>
       </div>
     </Link>
