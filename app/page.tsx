@@ -3,6 +3,8 @@ import { PLACEHOLDER_REPOS, PLACEHOLDER_DOMAINS } from '@/lib/placeholder-data';
 import { RepositoryCard } from '@/components/repository-card';
 import { DomainCard } from '@/components/domain-card';
 
+export const dynamic = 'force-dynamic';
+
 export default function HomePage() {
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-12 flex flex-col space-y-16">
