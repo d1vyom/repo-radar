@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getRepository, getRepositoryReadme, getLatestRelease } from '@/lib/github/repo';
 import { Star, GitFork, Eye, AlertCircle, Clock, HardDrive, Shield, Terminal, ExternalLink, Archive, Tag, ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
+import { CopyButton } from '@/components/copy-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -197,13 +198,13 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
               <div className="bg-background border border-border rounded-lg p-4 font-mono text-sm text-emerald-400 overflow-x-auto">
                 git clone {repo.clone_url}
               </div>
-              <button 
+              <CopyButton
+                text={`git clone ${repo.clone_url}`}
+                ariaLabel="Copy clone command"
                 className="absolute top-3 right-3 btn-ghost p-1.5 text-xs"
-                onClick={() => navigator.clipboard.writeText(`git clone ${repo.clone_url}`)}
-                aria-label="Copy clone command"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-              </button>
+              </CopyButton>
             </div>
           </div>
 
@@ -344,7 +345,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
           {/* Latest Release */}
           {latestRelease && (
             <div className="card p-5 animate-fade-in" style={{ animationDelay: '400ms' }}>
-              <h3 className="font-semibold flex items-center gap-2 mb-4 text-foreground">
+              <h3 className="font-semibold flex items_center gap-2 mb-4 text-foreground">
                 <Tag className="w-4 h-4" aria-hidden="true" /> Latest Release
               </h3>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
