@@ -1,47 +1,80 @@
 import 'server-only';
 import { GitHubRepository, GitHubRelease } from './types';
 
-// Helper to make authenticated requests with caching
-async function fetchWithAuth(url: string, acceptHeader?: string) {
-  const headers: HeadersInit = {};
+const GITHUB_API_BASE = 'https://api.github.com';
+
+async function fetchWithAuth(endpoint: string, acceptHeader?: string) {
+  const token = process.env.GITHUB_TOKEN;
   
-  if (process.env.GITHUB_TOKEN) {
-    headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
-  }
-  if (acceptHeader) {
-    headers['Accept'] = acceptHeader;
+  if (!token) {
+    throw new Error('GITHUB_TOKEN environment variable is not set.');
   }
 
-  return fetch(url, {
+  const url = endpoint.startsWith('http') ? endpoint : `${GITHUB_API_BASE}${endpoint}`;
+  
+  const headers = new Headers();
+  headers.set('Accept', acceptHeader || 'application/vnd.github.v3+json');
+  headers.set('Authorization', `Bearer ${token}`);
+  headers.set('X-GitHub-Api-Version', '2022-11-28');
+
+  const response = await fetch(url, {
     headers,
-    // Cache for 1 hour to keep the page fast and avoid rate limits
-    next: { revalidate: 3600 }, 
+    next: { revalidate: 3600 },
   });
+
+  const rateLimitRemaining = parseInt(response.headers.get('x-ratelimit-remaining') || '0', 10);
+
+  if (!response.ok) {
+    let errorMessage = `GitHub API error: ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      // Ignore JSON parse error
+    }
+
+    if (response.status === 403 && rateLimitRemaining === 0) {
+      throw new Error('RATE_LIMIT');
+    }
+    if (response.status === 404) {
+      throw new Error('NOT_FOUND');
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response;
 }
 
 export async function getRepository(owner: string, name: string): Promise<GitHubRepository | null> {
-  const res = await fetchWithAuth(`https://api.github.com/repos/${owner}/${name}`);
-  
-  if (res.status === 404) return null; // Not found, deleted, or private
-  if (res.status === 403 || res.status === 429) throw new Error('RATE_LIMIT');
-  if (!res.ok) throw new Error('API_ERROR');
-  
-  return res.json();
+  try {
+    const response = await fetchWithAuth(`/repos/${owner}/${name}`);
+    return response.json();
+  } catch (error: unknown) {
+    const err = error as Error;
+    if (err.message === 'NOT_FOUND') return null;
+    if (err.message === 'RATE_LIMIT') throw new Error('RATE_LIMIT');
+    console.error('getRepository error:', err);
+    throw new Error('API_ERROR');
+  }
 }
 
 export async function getRepositoryReadme(owner: string, name: string): Promise<string | null> {
-  // 'application/vnd.github.v3.html' tells GitHub to return raw HTML instead of Markdown
-  const res = await fetchWithAuth(
-    `https://api.github.com/repos/${owner}/${name}/readme`,
-    'application/vnd.github.v3.html'
-  );
-
-  if (!res.ok) return null;
-  return res.text();
+  try {
+    const response = await fetchWithAuth(
+      `/repos/${owner}/${name}/readme`,
+      'application/vnd.github.v3.html'
+    );
+    return response.text();
+  } catch {
+    return null;
+  }
 }
 
 export async function getLatestRelease(owner: string, name: string): Promise<GitHubRelease | null> {
-  const res = await fetchWithAuth(`https://api.github.com/repos/${owner}/${name}/releases/latest`);
-  if (!res.ok) return null;
-  return res.json() as Promise<GitHubRelease>;
+  try {
+    const response = await fetchWithAuth(`/repos/${owner}/${name}/releases/latest`);
+    return response.json();
+  } catch {
+    return null;
+  }
 }

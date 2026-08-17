@@ -23,10 +23,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       openGraph: {
         title: repo.full_name,
         description: repo.description || '',
-        images: [repo.owner.avatar_url],
+        images: [repo.owner.avatar_url || `https://github.com/${repo.owner.login}.png?size=80`],
       },
     };
-  } catch {
+  } catch (error) {
+    console.error('generateMetadata error:', error);
     return { title: 'Error | RepoRadar' };
   }
 }
@@ -61,6 +62,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
 
   } catch (error: unknown) {
     const err = error as Error;
+    console.error('RepositoryDetailPage error:', err);
     return (
       <div className="section py-20 text-center animate-fade-in">
         <AlertCircle className="w-12 h-12 text-danger mx-auto mb-4" />
@@ -94,13 +96,16 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
           <div className="flex items-start gap-5">
             <div className="relative shrink-0">
               <Image 
-                src={repo.owner.avatar_url} 
+                src={repo.owner.avatar_url || `https://github.com/${repo.owner.login}.png?size=80`}
                 alt={repo.owner.login} 
                 width={80}
                 height={80}
                 unoptimized
                 className="rounded-2xl border border-border/30"
                 sizes="80px"
+                onError={(e) => {
+                  e.currentTarget.src = `https://github.com/${repo.owner.login}.png?size=80`;
+                }}
               />
               {repo.archived && (
                 <div className="absolute -bottom-2 -right-2">
