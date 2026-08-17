@@ -14,6 +14,7 @@ async function fetchWithAuth(endpoint: string, acceptHeader?: string) {
   
   const headers = new Headers();
   headers.set('Accept', acceptHeader || 'application/vnd.github.v3+json');
+  // FIX: Use `token` prefix for classic PATs (ghp_...), not `Bearer`
   headers.set('Authorization', `token ${token}`);
   headers.set('X-GitHub-Api-Version', '2022-11-28');
 

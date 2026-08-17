@@ -103,7 +103,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
                 unoptimized
                 className="rounded-2xl border border-border/30"
                 sizes="80px"
-                />
+              />
               {repo.archived && (
                 <div className="absolute -bottom-2 -right-2">
                   <span className="badge badge-warning px-2 py-1 text-xs">
@@ -179,7 +179,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
             </Link>
           ))}
         </div>
-      )}
+      )
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Readme & Clone Info */}
@@ -202,7 +202,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
                 onClick={() => navigator.clipboard.writeText(`git clone ${repo.clone_url}`)}
                 aria-label="Copy clone command"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
               </button>
             </div>
           </div>
