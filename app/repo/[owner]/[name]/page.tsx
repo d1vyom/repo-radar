@@ -345,7 +345,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
           {/* Latest Release */}
           {latestRelease && (
             <div className="card p-5 animate-fade-in" style={{ animationDelay: '400ms' }}>
-              <h3 className="font-semibold flex items_center gap-2 mb-4 text-foreground">
+              <h3 className="font-semibold flex items-center gap-2 mb-4 text-foreground">
                 <Tag className="w-4 h-4" aria-hidden="true" /> Latest Release
               </h3>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
