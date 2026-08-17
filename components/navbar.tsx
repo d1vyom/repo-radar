@@ -1,27 +1,45 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Search, TrendingUp, Layers, Code2, GitBranch } from 'lucide-react';
 
 export function Navbar() {
+  const pathname = usePathname();
+  
+  const navItems = [
+    { href: '/search', label: 'Search', icon: Search },
+    { href: '/trending', label: 'Trending', icon: TrendingUp },
+    { href: '/domains', label: 'Domains', icon: Layers },
+    { href: '/languages', label: 'Languages', icon: Code2 },
+  ] as const;
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-14 max-w-7xl items-center px-4">
-        <Link href="/" className="flex items-center space-x-2 mr-6">
-          <GitBranch className="h-6 w-6 text-foreground" />
-          <span className="font-bold tracking-tight text-foreground">RepoRadar</span>
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+      <div className="section flex h-16 items-center">
+        <Link href="/" className="flex items-center space-x-2 mr-8 focus-visible-ring rounded-lg px-2 py-1" aria-label="RepoRadar Home">
+          <GitBranch className="h-6 w-6 text-primary" />
+          <span className="font-bold tracking-tight text-foreground text-lg">RepoRadar</span>
         </Link>
-        <nav className="flex items-center space-x-6 text-sm font-medium text-muted-foreground flex-1">
-          <Link href="/search" className="flex items-center hover:text-foreground transition-colors">
-            <Search className="mr-2 h-4 w-4" /> Search
-          </Link>
-          <Link href="/trending" className="flex items-center hover:text-foreground transition-colors">
-            <TrendingUp className="mr-2 h-4 w-4" /> Trending
-          </Link>
-          <Link href="/domains" className="flex items-center hover:text-foreground transition-colors">
-            <Layers className="mr-2 h-4 w-4" /> Domains
-          </Link>
-          <Link href="/languages" className="flex items-center hover:text-foreground transition-colors">
-            <Code2 className="mr-2 h-4 w-4" /> Languages
-          </Link>
+        <nav className="flex-1 flex items-center space-x-1" aria-label="Main navigation">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'text-primary bg-primary/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-surface-2'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </header>

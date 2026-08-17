@@ -91,10 +91,11 @@ export async function getMostStarredToday(limit = 10): Promise<RepositoryWithSta
 
 export async function getHiddenGems(limit = 10): Promise<RepositoryWithStats[]> {
   const repos = await getRankedRepositories();
-  // We added `is_hidden_gem` in the mapping above
-  return repos.filter((r: RepositoryWithStats & { is_hidden_gem?: boolean }) => r.is_hidden_gem)
-              .sort((a, b) => (b.trending_score || 0) - (a.trending_score || 0))
-              .slice(0, limit);
+  // `is_hidden_gem` is populated in the mapping above (see getRankedRepositories)
+  return repos
+    .filter((r) => r.is_hidden_gem)
+    .sort((a, b) => (b.trending_score || 0) - (a.trending_score || 0))
+    .slice(0, limit);
 }
 
 export async function getRecentlyUpdated(limit = 10): Promise<RepositoryWithStats[]> {

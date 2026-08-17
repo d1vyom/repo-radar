@@ -1,5 +1,5 @@
 import 'server-only';
-import { GitHubRepository } from './types';
+import { GitHubRepository, GitHubRelease } from './types';
 
 // Helper to make authenticated requests with caching
 async function fetchWithAuth(url: string, acceptHeader?: string) {
@@ -40,8 +40,8 @@ export async function getRepositoryReadme(owner: string, name: string): Promise<
   return res.text();
 }
 
-export async function getLatestRelease(owner: string, name: string) {
+export async function getLatestRelease(owner: string, name: string): Promise<GitHubRelease | null> {
   const res = await fetchWithAuth(`https://api.github.com/repos/${owner}/${name}/releases/latest`);
   if (!res.ok) return null;
-  return res.json();
+  return res.json() as Promise<GitHubRelease>;
 }
