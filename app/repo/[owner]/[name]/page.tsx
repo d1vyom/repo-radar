@@ -103,10 +103,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
                 unoptimized
                 className="rounded-2xl border border-border/30"
                 sizes="80px"
-                onError={(e) => {
-                  e.currentTarget.src = `https://github.com/${repo.owner.login}.png?size=80`;
-                }}
-              />
+                />
               {repo.archived && (
                 <div className="absolute -bottom-2 -right-2">
                   <span className="badge badge-warning px-2 py-1 text-xs">
