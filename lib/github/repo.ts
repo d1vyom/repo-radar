@@ -14,7 +14,7 @@ async function fetchWithAuth(endpoint: string, acceptHeader?: string) {
   
   const headers = new Headers();
   headers.set('Accept', acceptHeader || 'application/vnd.github.v3+json');
-  headers.set('Authorization', `Bearer ${token}`);
+  headers.set('Authorization', `token ${token}`);
   headers.set('X-GitHub-Api-Version', '2022-11-28');
 
   const response = await fetch(url, {
