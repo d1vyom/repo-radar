@@ -21,6 +21,7 @@ async function fetchWithAuth(endpoint: string, acceptHeader?: string) {
   const response = await fetch(url, {
     headers,
     next: { revalidate: 3600 },
+    signal: AbortSignal.timeout(15000),
   });
 
   const rateLimitRemaining = parseInt(response.headers.get('x-ratelimit-remaining') || '0', 10);

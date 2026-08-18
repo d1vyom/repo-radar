@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { getRepository, getRepositoryReadme, getLatestRelease } from '@/lib/github/repo';
 import { Star, GitFork, Eye, AlertCircle, Clock, HardDrive, Shield, Terminal, ExternalLink, Archive, Tag, ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 
-const CopyButton = dynamic(() => import('@/components/copy-button').then(mod => mod.CopyButton), { ssr: false });
+const CopyButton = nextDynamic(() => import('@/components/copy-button').then(mod => mod.CopyButton), { ssr: false });
 
 export const dynamic = 'force-dynamic';
 
@@ -43,8 +43,15 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
 
   try {
     const fetchWithTimeout = async <T,>(promise: Promise<T>): Promise<T> => {
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 8000));
-      return Promise.race([promise, timeout]);
+      let timeoutId: NodeJS.Timeout;
+      const timeout = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('TIMEOUT')), 15000);
+      });
+      try {
+        return await Promise.race([promise, timeout]);
+      } finally {
+        clearTimeout(timeoutId!);
+      }
     };
 
     [repo, readmeHtml, latestRelease] = await Promise.all([
