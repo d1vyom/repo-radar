@@ -36,7 +36,9 @@ export async function getRankedRepositories(): Promise<RepositoryWithStats[]> {
       .eq('repository_snapshots.snapshot_date', yesterdayString);
 
     if (error || !data) {
-      console.error('Failed to fetch analytics data, using placeholders:', error?.message);
+      if (error?.code !== '42P01') {
+        console.error('Failed to fetch analytics data, using placeholders:', error?.message);
+      }
       return PLACEHOLDER_REPOS;
     }
 
@@ -127,7 +129,9 @@ export async function getRecentlyUpdated(limit = 10): Promise<RepositoryWithStat
       .limit(limit);
     
     if (error || !data) {
-      console.error('getRecentlyUpdated error, using placeholders:', error?.message);
+      if (error?.code !== '42P01') {
+        console.error('getRecentlyUpdated error, using placeholders:', error?.message);
+      }
       return PLACEHOLDER_REPOS.slice(0, limit);
     }
     
@@ -164,7 +168,9 @@ export async function getPopularByDomain(domainSlug: string, limit = 10): Promis
       .eq('repository_domains.domains.slug', domainSlug);
 
     if (error || !data) {
-      console.error(`Failed to fetch repos for domain ${domainSlug}, using placeholders:`, error?.message);
+      if (error?.code !== '42P01') {
+        console.error(`Failed to fetch repos for domain ${domainSlug}, using placeholders:`, error?.message);
+      }
       return [];
     }
 

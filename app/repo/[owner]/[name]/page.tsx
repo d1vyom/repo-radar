@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { getRepository, getRepositoryReadme, getLatestRelease } from '@/lib/github/repo';
 import { Star, GitFork, Eye, AlertCircle, Clock, HardDrive, Shield, Terminal, ExternalLink, Archive, Tag, ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
-import { CopyButton } from '@/components/copy-button';
+import dynamic from 'next/dynamic';
+
+const CopyButton = dynamic(() => import('@/components/copy-button').then(mod => mod.CopyButton), { ssr: false });
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +36,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function RepositoryDetailPage({ params }: PageProps) {
-  let repo, readmeHtml, latestRelease;
-  let safeReadmeHtml = null;
+  let repo: Awaited<ReturnType<typeof getRepository>>;
+  let readmeHtml: string | null;
+  let latestRelease: Awaited<ReturnType<typeof getLatestRelease>>;
+  let safeReadmeHtml: string | null = null;
 
   try {
     const fetchWithTimeout = async <T,>(promise: Promise<T>): Promise<T> => {
@@ -180,7 +184,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
             </Link>
           ))}
         </div>
-      )
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Readme & Clone Info */}

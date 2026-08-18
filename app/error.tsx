@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { AlertCircle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
-import { AlertCircle, RefreshCw, Home, ChevronLeft } from 'lucide-react';
 
 export default function GlobalError({
   error,
@@ -31,10 +31,7 @@ export default function GlobalError({
           </p>
         )}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <button
-            onClick={reset}
-            className="btn-primary"
-          >
+          <button onClick={reset} className="btn-primary">
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
             Try Again
           </button>

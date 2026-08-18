@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { AlertCircle, RefreshCw, Home, Code2 } from 'lucide-react';
+import { AlertCircle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LanguagesError({
