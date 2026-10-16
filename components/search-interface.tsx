@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useDebounce } from '@/hooks/use-debounce';
 import { RepositoryCard } from '@/components/repository-card';
 import { SearchSkeleton } from '@/components/search-skeleton';
 import { RepositoryWithStats } from '@/types/repository';
@@ -17,97 +16,94 @@ interface SearchResponse {
 }
 
 function canonicalLanguage(value: string): string {
-  if (!value) return '';
-  const match = SUPPORTED_LANGUAGES.find((l) => l.toLowerCase() === value.toLowerCase());
-  return match ?? value;
+  return SUPPORTED_LANGUAGES.find(language => language.toLowerCase() === value.toLowerCase()) ?? value;
 }
 
 export default function SearchInterface() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  const initialQuery = searchParams.get('q') || '';
-  const initialLanguage = searchParams.get('language') || '';
-  const initialStars = searchParams.get('stars') || '';
-  const initialSort = searchParams.get('sort') || 'stars';
-  const initialDomain = searchParams.get('domain') || '';
-
-  const [searchTerm, setSearchTerm] = useState(initialQuery);
-  const [language, setLanguage] = useState(initialLanguage);
-  const [stars, setStars] = useState(initialStars);
-  const [sort, setSort] = useState(initialSort);
-  const [domain] = useState(initialDomain);
-  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10));
-
+  const queryString = searchParams.toString();
+  const query = searchParams.get('q') || '';
+  const language = searchParams.get('language') || '';
+  const stars = searchParams.get('stars') || '';
+  const sort = searchParams.get('sort') || 'stars';
+  const domain = searchParams.get('domain') || '';
+  const topic = searchParams.get('topic') || '';
+  const rawPage = Number(searchParams.get('page') || '1');
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  const [searchTerm, setSearchTerm] = useState(query);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [results, setResults] = useState<RepositoryWithStats[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
-
-  const createQueryString = useCallback(
-    (params: Record<string, string | number | null>) => {
-      const newSearchParams = new URLSearchParams(searchParams.toString());
-      Object.entries(params).forEach(([key, value]) => {
-        if (value === null || value === '') {
-          newSearchParams.delete(key);
-        } else {
-          newSearchParams.set(key, String(value));
-        }
-      });
-      return newSearchParams.toString();
-    },
-    [searchParams]
-  );
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    const queryString = createQueryString({
-      q: debouncedSearchTerm,
-      language,
-      stars,
-      sort,
-      domain: domain || null,
-      page: page > 1 ? page : null,
+    clearTimeout(timer.current);
+    setSearchTerm(query);
+    return () => clearTimeout(timer.current);
+  }, [query, queryString]);
+
+  const updateFilters = (changes: Record<string, string | number | null>, replace = false) => {
+    clearTimeout(timer.current);
+    const params = new URLSearchParams(queryString);
+    if (searchTerm !== query && !Object.hasOwn(changes, 'q')) params.set('q', searchTerm);
+    if (!Object.hasOwn(changes, 'page')) params.delete('page');
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value === null || value === '') params.delete(key);
+      else params.set(key, String(value));
     });
-    router.push(`${pathname}?${queryString}`, { scroll: false });
-  }, [debouncedSearchTerm, language, stars, sort, domain, page, pathname, router, createQueryString]);
+    const nextQuery = params.toString();
+    if (nextQuery !== queryString) {
+      const url = pathname + (nextQuery ? `?${nextQuery}` : '');
+      if (replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
+    }
+  };
+
+  const changeQuery = (value: string) => {
+    setSearchTerm(value);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => updateFilters({ q: value }, true), 500);
+  };
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchResults = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const query = searchParams.toString();
-        const res = await fetch(`/api/search?${query}`);
+        const res = await fetch(`/api/search?${queryString}`, { signal: controller.signal });
         const data: SearchResponse = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to fetch results');
+        if (controller.signal.aborted) return;
         setResults(data.items || []);
         setTotalCount(data.total_count || 0);
         setHasMore(Boolean(data.hasMore));
       } catch (err: unknown) {
+        if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
         setResults([]);
         setTotalCount(0);
         setHasMore(false);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
     fetchResults();
-  }, [searchParams]);
+    return () => controller.abort();
+  }, [queryString, retryCount]);
 
   const resetFilters = () => {
+    clearTimeout(timer.current);
     setSearchTerm('');
-    setLanguage('');
-    setStars('');
-    setSort('stars');
-    setPage(1);
+    router.push(pathname, { scroll: false });
   };
-
-  const hasActiveFilters = searchTerm || language || stars || sort !== 'stars' || domain;
+  const debouncedSearchTerm = query;
+  const hasActiveFilters = searchTerm || language || stars || sort !== 'stars' || domain || topic;
 
   return (
     <div className="flex flex-col md:flex-row gap-8">
@@ -123,15 +119,14 @@ export default function SearchInterface() {
               className="input-base pl-10 pr-10"
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
+                changeQuery(e.target.value);
               }}
             />
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" aria-hidden="true" />
             {searchTerm && (
               <button
                 type="button"
-                onClick={() => { setSearchTerm(''); setPage(1); }}
+                onClick={() => { setSearchTerm(''); updateFilters({ q: null }); }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-surface-2 transition-colors text-muted-foreground/60 hover:text-foreground"
                 aria-label="Clear search"
               >
@@ -149,11 +144,13 @@ export default function SearchInterface() {
             className="input-base appearance-none bg-input-bg"
             value={language.toLowerCase()}
             onChange={(e) => {
-              setLanguage(e.target.value);
-              setPage(1);
+              updateFilters({ language: e.target.value });
             }}
           >
             <option value="">All Languages</option>
+            {language && !SUPPORTED_LANGUAGES.some(value => value.toLowerCase() === language.toLowerCase()) && (
+              <option value={language.toLowerCase()}>{language}</option>
+            )}
             {SUPPORTED_LANGUAGES.map((lang) => (
               <option key={lang} value={lang.toLowerCase()}>
                 {lang}
@@ -170,14 +167,14 @@ export default function SearchInterface() {
             className="input-base appearance-none bg-input-bg"
             value={stars}
             onChange={(e) => {
-              setStars(e.target.value);
-              setPage(1);
+              updateFilters({ stars: e.target.value });
             }}
           >
             <option value="">Any</option>
-            <option value="100">{'>'} 100</option>
-            <option value="1000">{'>'} 1,000</option>
-            <option value="10000">{'>'} 10,000</option>
+            {stars && !['100', '1000', '10000'].includes(stars) && <option value={stars}>{'≥'} {Number(stars).toLocaleString()}</option>}
+            <option value="100">{'≥'} 100</option>
+            <option value="1000">{'≥'} 1,000</option>
+            <option value="10000">{'≥'} 10,000</option>
           </select>
         </div>
 
@@ -189,8 +186,7 @@ export default function SearchInterface() {
             className="input-base appearance-none bg-input-bg"
             value={sort}
             onChange={(e) => {
-              setSort(e.target.value);
-              setPage(1);
+              updateFilters({ sort: e.target.value === 'stars' ? null : e.target.value });
             }}
           >
             <option value="stars">Most Stars</option>
@@ -222,7 +218,7 @@ export default function SearchInterface() {
         )}
       </aside>
 
-      <main className="flex-1 min-w-0 animate-fade-in" style={{ animationDelay: '100ms' }}>
+      <div aria-live="polite" aria-busy={isLoading} className="flex-1 min-w-0 animate-fade-in" style={{ animationDelay: '100ms' }}>
         {/* Active Filters Bar */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
           {domain && (
@@ -231,7 +227,7 @@ export default function SearchInterface() {
               Domain: {domain}
               <button
                 type="button"
-                onClick={() => router.push(pathname + searchParams.toString().replace(/[?&]domain=[^&]*/, '').replace('?&', '?'))}
+                onClick={() => updateFilters({ domain: null })}
                 className="ml-1 hover:text-foreground"
                 aria-label="Remove domain filter"
               >
@@ -245,10 +241,18 @@ export default function SearchInterface() {
               Query: {debouncedSearchTerm}
               <button
                 type="button"
-                onClick={() => { setSearchTerm(''); setPage(1); }}
+                onClick={() => { setSearchTerm(''); updateFilters({ q: null }); }}
                 className="ml-1 hover:text-foreground"
                 aria-label="Remove query filter"
               >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </span>
+          )}
+          {topic && (
+            <span className="badge badge-primary gap-1.5">
+              Topic: {topic}
+              <button type="button" onClick={() => updateFilters({ topic: null })} aria-label="Remove topic filter">
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
@@ -259,7 +263,7 @@ export default function SearchInterface() {
               Lang: {canonicalLanguage(language)}
               <button
                 type="button"
-                onClick={() => { setLanguage(''); setPage(1); }}
+                onClick={() => { updateFilters({ language: null }); }}
                 className="ml-1 hover:text-foreground"
                 aria-label="Remove language filter"
               >
@@ -270,10 +274,10 @@ export default function SearchInterface() {
           {stars && (
             <span className="badge badge-warning gap-1.5">
               <Star className="h-3 w-3" aria-hidden="true" />
-              Stars: {'>'}{Number(stars).toLocaleString()}
+              Stars: {'≥'}{Number(stars).toLocaleString()}
               <button
                 type="button"
-                onClick={() => { setStars(''); setPage(1); }}
+                onClick={() => { updateFilters({ stars: null }); }}
                 className="ml-1 hover:text-foreground"
                 aria-label="Remove stars filter"
               >
@@ -294,7 +298,7 @@ export default function SearchInterface() {
             </div>
             <h3 className="text-lg font-semibold text-danger mb-2">Search Failed</h3>
             <p className="text-sm text-muted-foreground">{error}</p>
-            <button onClick={() => window.location.reload()} className="mt-4 btn-primary">Try Again</button>
+            <button onClick={() => setRetryCount(count => count + 1)} className="mt-4 btn-primary">Try Again</button>
           </div>
         ) : isLoading ? (
           <SearchSkeleton />
@@ -323,7 +327,7 @@ export default function SearchInterface() {
               <div className="flex justify-center items-center gap-3 mt-8 pt-6 border-t border-border/30 animate-fade-in">
                 <button
                   disabled={page === 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => updateFilters({ page: page > 2 ? page - 1 : null })}
                   className="btn-secondary"
                   aria-label="Previous page"
                 >
@@ -335,7 +339,7 @@ export default function SearchInterface() {
                 </span>
                 <button
                   disabled={!hasMore}
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => updateFilters({ page: page + 1 })}
                   className="btn-secondary"
                   aria-label="Next page"
                 >
@@ -346,7 +350,7 @@ export default function SearchInterface() {
             )}
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }

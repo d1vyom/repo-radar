@@ -1,24 +1,28 @@
-import sanitizeHtml from 'sanitize-html';
+import { sanitizeReadme } from '@/lib/github/readme';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getRepository, getRepositoryReadme, getLatestRelease } from '@/lib/github/repo';
 import { Star, GitFork, Eye, AlertCircle, Clock, HardDrive, Shield, Terminal, ExternalLink, Archive, Tag, ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
-import nextDynamic from 'next/dynamic';
-
-const CopyButton = nextDynamic(() => import('@/components/copy-button').then(mod => mod.CopyButton), { ssr: false });
+import { CopyButton } from '@/components/copy-button';
+import { GitHubApiError } from '@/lib/github/client';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  params: { owner: string; name: string };
+  params: Promise<{ owner: string; name: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { owner, name } = await params;
+  let repo: Awaited<ReturnType<typeof getRepository>>;
   try {
-    const repo = await getRepository(params.owner, params.name);
-    if (!repo) return { title: 'Repository Not Found | RepoRadar' };
+    repo = await getRepository(owner, name);
+  } catch {
+    return { title: 'Error | RepoRadar' };
+  }
+  if (!repo) notFound();
     
     return {
       title: `${repo.full_name} | RepoRadar`,
@@ -29,60 +33,33 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         images: [repo.owner.avatar_url || `https://github.com/${repo.owner.login}.png?size=80`],
       },
     };
-  } catch (error) {
-    console.error('generateMetadata error:', error);
-    return { title: 'Error | RepoRadar' };
-  }
 }
 
 export default async function RepositoryDetailPage({ params }: PageProps) {
+  const { owner, name } = await params;
   let repo: Awaited<ReturnType<typeof getRepository>>;
   let readmeHtml: string | null;
   let latestRelease: Awaited<ReturnType<typeof getLatestRelease>>;
   let safeReadmeHtml: string | null = null;
 
   try {
-    const fetchWithTimeout = async <T,>(promise: Promise<T>): Promise<T> => {
-      let timeoutId: NodeJS.Timeout;
-      const timeout = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('TIMEOUT')), 15000);
-      });
-      try {
-        return await Promise.race([promise, timeout]);
-      } finally {
-        clearTimeout(timeoutId!);
-      }
-    };
-
     [repo, readmeHtml, latestRelease] = await Promise.all([
-      fetchWithTimeout(getRepository(params.owner, params.name)),
-      fetchWithTimeout(getRepositoryReadme(params.owner, params.name)),
-      fetchWithTimeout(getLatestRelease(params.owner, params.name))
+      getRepository(owner, name), getRepositoryReadme(owner, name), getLatestRelease(owner, name),
     ]);
-
-    if (readmeHtml) {
-      safeReadmeHtml = sanitizeHtml(readmeHtml, {
-        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div']),
-        allowedAttributes: {
-          ...sanitizeHtml.defaults.allowedAttributes,
-          '*': ['class', 'id', 'align', 'dir'],
-          'img': ['src', 'alt', 'width', 'height', 'max-width']
-        },
-        allowedSchemes: ['http', 'https', 'mailto']
-      });
+    if (readmeHtml && repo) {
+      safeReadmeHtml = sanitizeReadme(readmeHtml, repo.owner.login, repo.name, repo.default_branch);
     }
-
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('RepositoryDetailPage error:', err);
+
     return (
       <div className="section py-20 text-center animate-fade-in">
         <AlertCircle className="w-12 h-12 text-danger mx-auto mb-4" />
         <h1 className="text-2xl font-bold mb-2">Failed to load repository</h1>
         <p className="text-muted-foreground max-w-md mx-auto">
-          {err.message === 'RATE_LIMIT' 
+          {error instanceof GitHubApiError && error.status === 429
             ? 'GitHub API rate limit exceeded. Please try again later.' 
-            : err.message === 'TIMEOUT'
+            : err.name === 'TimeoutError' || err.name === 'AbortError'
             ? 'The request took too long to complete.'
             : 'There was an error communicating with the GitHub API.'}
         </p>
@@ -105,7 +82,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
       {/* Header Section */}
       <div className="border-b border-border/30 pb-10 animate-fade-in">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div className="flex items-start gap-5">
+          <div className="flex min-w-0 items-start gap-3 sm:gap-5">
             <div className="relative shrink-0">
               <Image 
                 src={repo.owner.avatar_url || `https://github.com/${repo.owner.login}.png?size=80`}
@@ -125,10 +102,10 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
                 </div>
               )}
             </div>
-            <div>
+            <div className="min-w-0 break-words">
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight flex flex-wrap items-center gap-2">
                 <Link 
-                  href={`/search?q=${repo.owner.login}`} 
+                  href={`/search?q=${encodeURIComponent(`user:${repo.owner.login}`)}`}
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   {repo.owner.login}
@@ -268,7 +245,7 @@ export default async function RepositoryDetailPage({ params }: PageProps) {
                   <Eye className="w-4 h-4" aria-hidden="true" />
                   Watchers
                 </div>
-                <span className="text-2xl font-bold tabular-nums text-foreground">{repo.watchers_count.toLocaleString()}</span>
+                <span className="text-2xl font-bold tabular-nums text-foreground">{(repo.subscribers_count ?? 0).toLocaleString()}</span>
               </div>
               <div className="text-center p-3 bg-surface-2 rounded-xl">
                 <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-sm mb-1">

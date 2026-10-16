@@ -52,7 +52,7 @@ export function classifyRepository(
         score += 0.6;
       }
       // Description and language parsing carry a standard weight (0.3)
-      else if (textToAnalyze.includes(keyword)) {
+      else if (new RegExp(`(^|[^a-z0-9])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`, 'i').test(textToAnalyze)) {
         score += 0.3;
       }
     });

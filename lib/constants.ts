@@ -34,7 +34,7 @@ export const DOMAIN_TOPIC_MAP: Record<string, string[]> = {
  */
 export const KNOWN_DOMAINS = Object.keys(DOMAIN_TOPIC_MAP).map((slug) => ({
   slug,
-  name: slug
+  name: ({ ai: 'Artificial Intelligence', iot: 'Internet of Things', nlp: 'Natural Language Processing', devops: 'DevOps' } as Record<string, string>)[slug] ?? slug
     .split('-')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' '),

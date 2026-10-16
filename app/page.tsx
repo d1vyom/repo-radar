@@ -1,66 +1,17 @@
 import Link from 'next/link';
-import { PLACEHOLDER_REPOS, PLACEHOLDER_DOMAINS } from '@/lib/placeholder-data';
+import { DataNotice } from '@/components/data-notice';
 import { RepositoryCard } from '@/components/repository-card';
 import { DomainCard } from '@/components/domain-card';
 import { HeroSearch } from '@/components/hero-search';
 import { getTrendingToday } from '@/lib/analytics';
-import { supabaseAdmin } from '@/lib/supabase/server';
-import { KNOWN_DOMAINS } from '@/lib/constants';
-import { RepositoryWithStats } from '@/types/repository';
+import { getDomains } from '@/lib/directories';
 import { ArrowRight, TrendingUp, Layers } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
 
-async function getTrending(): Promise<RepositoryWithStats[]> {
-  try {
-    const repos = await getTrendingToday(8);
-    if (repos.length > 0) return repos;
-    return PLACEHOLDER_REPOS;
-  } catch (error) {
-    console.error('Trending fetch failed, using placeholders:', error);
-    return PLACEHOLDER_REPOS;
-  }
-}
-
-async function getDomains() {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('domains')
-      .select('id, slug, name');
-
-    if (error || !data || data.length === 0) {
-      return PLACEHOLDER_DOMAINS.map(({ slug, name, count }) => ({ slug, name, count }));
-    }
-
-    // Get actual repo counts from repository_domains join table
-    const { data: joinData } = await supabaseAdmin
-      .from('repository_domains')
-      .select('domain_id');
-
-    const counts: Record<string, number> = {};
-    if (joinData) {
-      for (const row of joinData as unknown as { domain_id: string }[]) {
-        counts[row.domain_id] = (counts[row.domain_id] ?? 0) + 1;
-      }
-    }
-
-    return data
-      .map((d) => ({
-        slug: d.slug,
-        name: d.name,
-        count: counts[d.id] ?? 0,
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  } catch (error) {
-    console.error('Domains fetch failed, using fallback:', error);
-    return KNOWN_DOMAINS.slice(0, 8).map(({ slug, name }) => ({ slug, name, count: 0 }));
-  }
-}
-
 export default async function HomePage() {
-  const [trendingRepos, domains] = await Promise.all([getTrending(), getDomains()]);
+  const [trendingRepos, domains] = await Promise.all([getTrendingToday(8), getDomains()]);
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-12 flex flex-col space-y-20">
@@ -68,7 +19,7 @@ export default async function HomePage() {
       <section className="flex flex-col items-center text-center space-y-8 pt-8 animate-fade-in">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium animate-slide-up">
           <TrendingUp className="h-4 w-4" aria-hidden="true" />
-          <span>Live trending data updated daily</span>
+          <span>Explore open-source repositories</span>
         </div>
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-foreground max-w-4xl animate-slide-up" style={{ animationDelay: '100ms' }}>
           Discover the{' '}
@@ -78,11 +29,12 @@ export default async function HomePage() {
           Ecosystem
         </h1>
         <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl animate-slide-up" style={{ animationDelay: '200ms' }}>
-          Track trending repositories, explore specific domains, and find the fastest growing tools in real-time.
+          Track repository growth, explore specific domains, and discover tools across the open-source ecosystem.
         </p>
         <HeroSearch className="w-full max-w-3xl animate-slide-up" style={{ animationDelay: '300ms' }} />
       </section>
 
+      {(trendingRepos.some(repo => repo.is_sample) || domains.some(domain => domain.is_sample)) && <DataNotice />}
       {/* Trending Today */}
       <section className="animate-fade-in" style={{ animationDelay: '400ms' }}>
         <div className="section-header">
@@ -119,7 +71,7 @@ export default async function HomePage() {
           </Link>
         </div>
         <div className="domain-grid">
-          {domains.map((domain) => (
+          {domains.slice(0, 8).map((domain) => (
             <DomainCard
               key={domain.slug}
               name={domain.name}

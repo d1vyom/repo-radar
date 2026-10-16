@@ -1,6 +1,6 @@
 import { classifyRepository } from '../classification/engine';
 import 'server-only';
-import { supabaseAdmin } from './server';
+import { getSupabaseAdmin } from './server';
 import { GitHubRepository } from '@/lib/github/types';
 
 /**
@@ -32,7 +32,7 @@ export async function syncRepositoryToDatabase(repo: GitHubRepository): Promise<
 
   // 2. Upsert the Repository
   // If github_id already exists, we update all metrics and metadata to keep it fresh.
-  const { data: upsertedRepo, error: repoError } = await supabaseAdmin
+  const { data: upsertedRepo, error: repoError } = await getSupabaseAdmin()
     .from('repositories')
     .upsert([repoData], { 
       onConflict: 'github_id',
@@ -58,7 +58,7 @@ export async function syncRepositoryToDatabase(repo: GitHubRepository): Promise<
     forks_count: repo.forks_count,
   };
 
-  const { error: snapshotError } = await supabaseAdmin
+  const { error: snapshotError } = await getSupabaseAdmin()
     .from('repository_snapshots')
     .upsert([snapshotData], {
       onConflict: 'repository_id, snapshot_date',
@@ -66,8 +66,7 @@ export async function syncRepositoryToDatabase(repo: GitHubRepository): Promise<
     });
 
   if (snapshotError) {
-    console.error(`Failed to insert snapshot for ${repo.full_name}:`, snapshotError.message);
-    // We don't throw here to avoid failing the whole sync if just the snapshot fails
+    throw new Error(`Snapshot sync failed for ${repo.full_name}`);
   }
   // 4. Run Domain Classification
   const classifications = classifyRepository(repo.description, repo.topics, repo.language);
@@ -75,10 +74,14 @@ export async function syncRepositoryToDatabase(repo: GitHubRepository): Promise<
   if (classifications.length > 0) {
     // Fetch internal Domain UUIDs based on slugs
     const slugs = classifications.map((c) => c.domainSlug);
-    const { data: domains } = await supabaseAdmin
+    const { data: domains, error: domainError } = await getSupabaseAdmin()
       .from('domains')
       .select('id, slug')
       .in('slug', slugs);
+
+    if (domainError || !domains || domains.length !== slugs.length) {
+      throw new Error(`Domain lookup failed for ${repo.full_name}; check domain seeds.`);
+    }
 
     if (domains && domains.length > 0) {
       // Create join table records
@@ -88,14 +91,21 @@ export async function syncRepositoryToDatabase(repo: GitHubRepository): Promise<
       }));
 
       // Upsert the relationships
-      const { error: linkError } = await supabaseAdmin
+      const { error: linkError } = await getSupabaseAdmin()
         .from('repository_domains')
         .upsert(domainLinks, { onConflict: 'repository_id, domain_id' });
 
       if (linkError) {
-        console.error(`Failed to link domains for ${repo.full_name}:`, linkError.message);
+        throw new Error(`Domain sync failed for ${repo.full_name}`);
       }
+
+      const { error: cleanupError } = await getSupabaseAdmin().from('repository_domains')
+        .delete().eq('repository_id', internalRepoId).not('domain_id', 'in', `(${domains.map(domain => domain.id).join(',')})`);
+      if (cleanupError) throw new Error(`Domain cleanup failed for ${repo.full_name}`);
     }
+  } else {
+    const { error } = await getSupabaseAdmin().from('repository_domains').delete().eq('repository_id', internalRepoId);
+    if (error) throw new Error(`Domain cleanup failed for ${repo.full_name}`);
   }
   return internalRepoId;
 }

@@ -1,48 +1,11 @@
 import Link from 'next/link';
-import { supabaseAdmin } from '@/lib/supabase/server';
-import { SUPPORTED_LANGUAGES } from '@/lib/constants';
+import { getTopLanguages } from '@/lib/directories';
+
 import { Code2, ChevronRight, Search } from 'lucide-react';
+import { DataNotice } from '@/components/data-notice';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 600;
-
-interface LanguageRow {
-  language: string;
-  count: number;
-}
-
-async function getTopLanguages(limit = 24): Promise<LanguageRow[]> {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('repositories')
-      .select('language')
-      .not('language', 'is', null);
-
-    if (error || !data) {
-      return SUPPORTED_LANGUAGES.slice(0, limit).map((language) => ({ language, count: 0 }));
-    }
-
-    const counts = new Map<string, number>();
-    for (const row of data as unknown as { language: string | null }[]) {
-      if (!row.language) continue;
-      counts.set(row.language, (counts.get(row.language) ?? 0) + 1);
-    }
-
-    const sorted = [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit)
-      .map(([language, count]) => ({ language, count }));
-
-    if (sorted.length === 0) {
-      return SUPPORTED_LANGUAGES.slice(0, limit).map((language) => ({ language, count: 0 }));
-    }
-
-    return sorted;
-  } catch (error) {
-    console.error('Languages page fetch failed, using fallback:', error);
-    return SUPPORTED_LANGUAGES.slice(0, limit).map((language) => ({ language, count: 0 }));
-  }
-}
 
 export default async function LanguagesPage() {
   const languages = await getTopLanguages();
@@ -69,6 +32,7 @@ export default async function LanguagesPage() {
         </div>
       </div>
 
+      {languages.some(language => language.is_sample) && <DataNotice />}
       {languages.length === 0 ? (
         <div className="empty-state animate-fade-in">
           <Search className="empty-state-icon" />

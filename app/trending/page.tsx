@@ -1,24 +1,12 @@
 import Link from 'next/link';
 import { RepositoryCard } from '@/components/repository-card';
-import { PLACEHOLDER_REPOS } from '@/lib/placeholder-data';
+import { DataNotice } from '@/components/data-notice';
 import { getTrendingToday, getMostStarredToday, getHiddenGems, getRecentlyUpdated } from '@/lib/analytics';
 import { RepositoryWithStats } from '@/types/repository';
 import { TrendingUp, Star, Gem, Clock, Search, Filter } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
-
-const PLACEHOLDER = PLACEHOLDER_REPOS;
-
-async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
-  try {
-    const data = await promise;
-    return data && (data as unknown[]).length ? data : fallback;
-  } catch (error) {
-    console.error('Trending page fetch failed, using placeholders:', error);
-    return fallback;
-  }
-}
 
 interface SectionProps {
   id: string;
@@ -80,10 +68,10 @@ function Section({ id, icon, title, description, repos, empty, badge, badgeColor
 
 export default async function TrendingPage() {
   const [trending, mostStarred, hiddenGems, recentlyUpdated] = await Promise.all([
-    safe(getTrendingToday(12), PLACEHOLDER as RepositoryWithStats[]),
-    safe(getMostStarredToday(12), PLACEHOLDER as RepositoryWithStats[]),
-    safe(getHiddenGems(12), [] as RepositoryWithStats[]),
-    safe(getRecentlyUpdated(12), PLACEHOLDER as RepositoryWithStats[]),
+    getTrendingToday(12),
+    getMostStarredToday(12),
+    getHiddenGems(12),
+    getRecentlyUpdated(12),
   ]);
 
   return (
@@ -109,6 +97,7 @@ export default async function TrendingPage() {
         </div>
       </div>
 
+      {[...trending, ...mostStarred, ...hiddenGems, ...recentlyUpdated].some(repo => repo.is_sample) && <DataNotice />}
       <nav className="flex flex-wrap gap-2 animate-fade-in" style={{ animationDelay: '100ms' }} aria-label="Trending sections">
         <a href="#trending" className="badge badge-primary">Trending Now</a>
         <a href="#most-starred" className="badge badge-warning">Top Stars Today</a>

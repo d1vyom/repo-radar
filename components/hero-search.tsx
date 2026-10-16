@@ -53,7 +53,7 @@ export function HeroSearch({ initialQuery = '', className, style }: HeroSearchPr
           Search
         </button>
       </div>
-      <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-4 text-sm text-muted-foreground">
         <span>{'Try: "react hooks", "machine learning", "rust cli"'}</span>
         <Link 
           href="/search" 

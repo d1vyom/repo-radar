@@ -1,84 +1,59 @@
-# RepoRadar 🎯
+# RepoRadar
 
-RepoRadar is an intelligent, high-performance GitHub repository explorer and analytics engine. It helps developers discover trending projects, analyze repository health, and find hidden gems across the open-source ecosystem.
+Discover GitHub repositories by query, language, topic, domain, stars, and recent activity. The application uses Next.js 15 App Router, React 18, TypeScript, Tailwind CSS, the GitHub REST API, and a Supabase catalog.
 
-## 🚀 Features
+## Run locally
 
-*   **Intelligent Search**: Fast, debounced repository search with multi-parameter filtering (language, stars, sorting).
-*   **Automated Sync**: Nightly Vercel Cron jobs fetch, classify, and sync top repositories directly from GitHub.
-*   **Domain Classification**: Deterministic categorization of repositories into domains like AI, Web3, and DevOps based on metadata and topics.
-*   **Advanced Analytics**: Tracks historical repository metrics (stars, forks) via a materialized Supabase view to calculate real-time trending scores.
-*   **Zero-Trust Security**: Robust API route validation, rate-limit handling, and strict XSS sanitization for GitHub README rendering.
+Requires Node.js 22.12 or newer and npm.
 
-## 🛠️ Tech Stack
+```powershell
+npm ci
+Copy-Item .env.example .env.local
+npm run dev
+```
 
-*   **Framework**: Next.js 14 (App Router, Server Components)
-*   **Language**: TypeScript
-*   **Styling**: Tailwind CSS
-*   **Database**: Supabase (PostgreSQL + pg_cron)
-*   **External APIs**: GitHub REST API
-*   **Deployment**: Vercel
+Open http://localhost:3000. Existing `.env.local` files should be edited rather than overwritten.
 
-## 🏗️ Architecture
+Public GitHub search and repository details work without a token, subject to GitHub's unauthenticated rate limit. Set a valid `GITHUB_TOKEN` to increase that limit; public read access does not require write scopes. If a configured token is rejected, the app retries the public read without it.
 
-1.  **Frontend**: Next.js React Server Components (RSC) handle heavy data fetching, keeping client bundles minimal. Client components are used exclusively for interactive elements (like the search interface).
-2.  **Database Layer**: Supabase handles relational data (`repositories`, `domains`) and temporal data (`repository_snapshots`). A custom PostgreSQL Function + Trigger automatically refreshes a Materialized View to serve lightning-fast trending analytics.
-3.  **Sync Pipeline**: A secure, idempotent API route (`/api/cron/sync`) queries GitHub, maps data to internal types, runs the domain classification engine, and upserts records into Supabase.
+## Database and analytics
 
-## 💻 Local Setup
+Configure `NEXT_PUBLIC_SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY` for the live catalog. The optional anon key is reserved for client-side integrations; the current website reads catalog data on the server. Never prefix the service-role key with `NEXT_PUBLIC_`.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/yourusername/repo-radar.git](https://github.com/yourusername/repo-radar.git)
-    cd repo-radar
-    ```
+Apply the SQL migrations under `supabase/migrations/` to your own database in order, including the domain seeds and catalog protection migration. The protection migration enables RLS and reserves writes for the server-side service-role client. No remote database migration is part of local verification.
 
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
+Without database configuration, or during an outage, discovery pages show clearly labeled illustrative samples. Known domain routes remain available and link to public GitHub searches. Live database results containing no repositories remain empty rather than becoming sample rankings.
 
-3.  **Set up environment variables:**
-    Copy the example environment file and fill in your keys.
-    ```bash
-    cp .env.example .env.local
-    ```
+The daily `/api/cron/sync` endpoint requires `Authorization: Bearer <CRON_SECRET>`. It fetches popular repositories and low-star candidates, deduplicates them, and saves metadata, daily snapshots, and domain links. Failed snapshot or classification writes are reported as failures. Running an authenticated sync writes to the configured database; do not invoke it as a read-only health check.
 
-4.  **Run the development server:**
-    ```bash
-    npm run dev
-    ```
-    Visit `http://localhost:3000`.
+Trending scores are computed in `lib/analytics.ts` from current counts and yesterday's snapshot. There is no materialized view, database refresh trigger, or `pg_cron` requirement. Growth becomes available after daily snapshots exist for consecutive days. The Vercel schedule is defined in `vercel.json`.
 
-## 🔐 Environment Variables & Setup
+## Verification
 
-### GitHub Token Setup
-1. Go to [GitHub Developer Settings](https://github.com/settings/tokens).
-2. Generate a new Classic Token with `public_repo` scope.
-3. Assign it to `GITHUB_TOKEN` in your `.env.local`.
+```powershell
+npm test -- --runInBand
+npm run lint
+npm run typecheck
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
 
-### Supabase Setup
-1. Create a new Supabase project.
-2. Run the SQL migrations found in the `/supabase/migrations` folder to build the schema.
-3. Copy the Project URL, Anon Key, and Service Role Key from the Supabase API settings into your `.env.local`.
+Browser tests build into `.next-e2e` and start an isolated local production server on port 3101. Test fetch caches are separate from the real `.next` preview. GitHub responses are fixtures and database credentials are disabled; tests never deploy or synchronize the real database. `BASE_URL` can target an already running local server for manual smoke checks, but fixture-specific detail tests require the isolated server.
 
-### Cron Secret
-Generate a random secure string (e.g., using `openssl rand -hex 32`) and assign it to `CRON_SECRET`.
+To preview the actual configured application after building:
 
-## ☁️ Vercel Deployment
+```powershell
+npm run start -- --port 3100
+```
 
-RepoRadar is fully optimized for Vercel deployment.
+Set `NEXT_PUBLIC_APP_BASE_URL` before building to configure the canonical sitemap/robots URL. Use `npm audit --omit=dev` to check runtime dependencies. See `docs/verification/2026-10-16-repair-report.md` for repair evidence and remaining environment/toolchain limitations.
 
-1. Push your code to a GitHub repository.
-2. Log in to Vercel and click **Add New Project**.
-3. Import your repository.
-4. Open the **Environment Variables** section in the Vercel deployment settings and paste all values from your `.env.local`.
-5. Click **Deploy**.
+## Troubleshooting
 
-Vercel will automatically read the `vercel.json` file and configure the daily cron job targeting `/api/cron/sync`.
+- **Search rate limit:** wait for GitHub's reset or configure a valid token. A rejected token falls back to the lower anonymous limit.
+- **Sample data:** verify that the Supabase project is active, its hostname resolves, its service key is valid, and all migrations and seeds have been applied.
+- **Empty growth/hidden gems:** initial synchronization creates the first snapshots; daily comparisons need history. Only synchronized repositories can appear in the analytics catalog.
+- **Sync failure:** verify the cron secret, GitHub access, database access, and migration state. The JSON response includes successful/failed counts; a partial failure does not claim success.
 
-## 🚑 Troubleshooting
-
-*   **GitHub Rate Limits**: If searches or syncs fail, ensure your `GITHUB_TOKEN` is valid. Unauthenticated requests are strictly throttled by GitHub.
-*   **Stale Trending Data**: Ensure the Supabase `pg_cron` extension is active and successfully calling the `refresh_repository_stats()` function nightly.
-*   **Sync Cron Failing**: Verify that the `CRON_SECRET` in your Vercel Environment Variables exactly matches the one expected by the `/api/cron/sync` route.
+Deployment requires an explicit separate instruction from the project owner.

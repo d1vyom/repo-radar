@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "codex/project-repair": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/sync",

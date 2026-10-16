@@ -16,19 +16,19 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-      <div className="section flex h-16 items-center">
-        <Link href="/" className="flex items-center space-x-2 mr-8 focus-visible-ring rounded-lg px-2 py-1" aria-label="RepoRadar Home">
+      <div className="section flex min-h-16 flex-wrap items-center gap-y-1 py-2 sm:flex-nowrap sm:py-0">
+        <Link href="/" className="flex items-center space-x-2 sm:mr-8 focus-visible-ring rounded-lg px-2 py-1" aria-label="RepoRadar Home">
           <GitBranch className="h-6 w-6 text-primary" />
           <span className="font-bold tracking-tight text-foreground text-lg">RepoRadar</span>
         </Link>
-        <nav className="flex-1 flex items-center space-x-1" aria-label="Main navigation">
+        <nav className="w-full sm:w-auto sm:flex-1 flex items-center justify-between sm:justify-start gap-0.5" aria-label="Main navigation">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-1 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'text-primary bg-primary/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-surface-2'

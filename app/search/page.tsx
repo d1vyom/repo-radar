@@ -19,7 +19,7 @@ function SearchSkeleton() {
         <div className="h-10 bg-surface-2 rounded-lg border border-border/50"></div>
         <div className="h-10 bg-surface-2 rounded-lg border border-border/50"></div>
       </aside>
-      <main className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
         <div className="h-10 bg-surface-2 rounded-lg border border-border/50 mb-6"></div>
         <div className="repo-grid-compact">
           {[...Array(6)].map((_, i) => (
@@ -35,7 +35,7 @@ function SearchSkeleton() {
             </div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

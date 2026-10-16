@@ -10,6 +10,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production
@@ -36,3 +37,12 @@ yarn-error.log*
 
 .vercel
 .env*
+!.env.example
+
+# Generated validation output
+/test-results/
+/playwright-report/
+/.playwright-mcp/
+*.tsbuildinfo
+/.superpowers/
+/supabase/.temp/

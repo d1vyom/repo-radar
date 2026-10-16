@@ -1,26 +1,24 @@
 import Link from 'next/link';
 import { getPopularByDomain } from '@/lib/analytics';
 import { RepositoryCard } from '@/components/repository-card';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { KNOWN_DOMAINS } from '@/lib/constants';
+import { DataNotice } from '@/components/data-notice';
 import { notFound } from 'next/navigation';
 import { Layers, ArrowRight } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DomainPage({ params }: { params: { slug: string } }) {
+export default async function DomainPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   // 1. Validate the domain exists
-  const { data: domain } = await supabaseAdmin
-    .from('domains')
-    .select('name')
-    .eq('slug', params.slug)
-    .single();
+  const domain = KNOWN_DOMAINS.find(domain => domain.slug === slug);
 
   if (!domain) {
     notFound();
   }
 
   // 2. Fetch classified repositories
-  const repositories = await getPopularByDomain(params.slug, 20);
+  const repositories = await getPopularByDomain(slug, 20);
 
   return (
     <div className="section py-12 space-y-8">
@@ -42,6 +40,8 @@ export default async function DomainPage({ params }: { params: { slug: string } 
         </Link>
       </div>
 
+      {repositories.some(repo => repo.is_sample) && <DataNotice />}
+      <Link href={`/search?domain=${encodeURIComponent(slug)}`} className="btn-secondary">Search this domain on GitHub</Link>
       {repositories.length === 0 ? (
         <div className="empty-state animate-fade-in">
           <Layers className="empty-state-icon" />

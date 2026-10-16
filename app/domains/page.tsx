@@ -1,52 +1,10 @@
 import Link from 'next/link';
 import { Layers, ChevronRight, Search } from 'lucide-react';
-import { supabaseAdmin } from '@/lib/supabase/server';
-import { KNOWN_DOMAINS } from '@/lib/constants';
+import { getDomains } from '@/lib/directories';
+import { DataNotice } from '@/components/data-notice';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 600;
-
-interface DomainRow {
-  slug: string;
-  name: string;
-  count: number;
-}
-
-async function getDomains(): Promise<DomainRow[]> {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('domains')
-      .select('id, slug, name')
-      .order('name', { ascending: true });
-
-    if (error || !data || data.length === 0) {
-      return KNOWN_DOMAINS.map(({ slug, name }) => ({ slug, name, count: 0 }));
-    }
-
-    // Get actual repo counts from repository_domains join table
-    const { data: joinData } = await supabaseAdmin
-      .from('repository_domains')
-      .select('domain_id');
-
-    const counts: Record<string, number> = {};
-    if (joinData) {
-      for (const row of joinData as unknown as { domain_id: string }[]) {
-        counts[row.domain_id] = (counts[row.domain_id] ?? 0) + 1;
-      }
-    }
-
-    return data
-      .map((d) => ({
-        slug: d.slug,
-        name: d.name,
-        count: counts[d.id] ?? 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-  } catch (error) {
-    console.error('Domains page fetch failed, using fallback:', error);
-    return KNOWN_DOMAINS.map(({ slug, name }) => ({ slug, name, count: 0 }));
-  }
-}
 
 export default async function DomainsPage() {
   const domains = await getDomains();
@@ -69,10 +27,11 @@ export default async function DomainsPage() {
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span className="badge badge-muted">{domains.length} Domains</span>
-          <span className="badge badge-primary">{totalRepos.toLocaleString()} Total Repositories</span>
+          <span className="badge badge-primary">{totalRepos.toLocaleString()} Domain Assignments</span>
         </div>
       </div>
 
+      {domains.some(domain => domain.is_sample) && <DataNotice />}
       {domains.length === 0 ? (
         <div className="empty-state animate-fade-in">
           <Search className="empty-state-icon" />

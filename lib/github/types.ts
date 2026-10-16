@@ -36,6 +36,7 @@ export interface GitHubRepository {
   size: number;
   stargazers_count: number;
   watchers_count: number;
+  subscribers_count?: number;
   language: string | null;
   has_issues: boolean;
   has_projects: boolean;

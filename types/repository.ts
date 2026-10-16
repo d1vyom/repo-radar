@@ -38,8 +38,7 @@ export interface RepositorySnapshot {
 }
 
 /**
- * Represents the calculated trending statistics from our Materialized View.
- * Maps to `repository_stats_mv`.
+ * Represents trending statistics calculated from repository snapshots.
  */
 export interface RepositoryStats {
   repository_id: string;
@@ -60,4 +59,5 @@ export interface RepositoryStats {
 export type RepositoryWithStats = Repository &
   Partial<RepositoryStats> & {
     is_hidden_gem?: boolean;
+    is_sample?: boolean;
   };

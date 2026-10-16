@@ -27,28 +27,29 @@ function buildQueryString(filters: SearchFilters): string {
   // 1. Base Query
   if (filters.query) {
     qualifiers.push(filters.query);
-  } else {
-    // GitHub requires a query. If none is provided, default to finding public repos with at least 1 star.
-    qualifiers.push('stars:>0');
   }
+  qualifiers.push('is:public');
 
   // 2. Exact Match Qualifiers
-  if (filters.language && filters.language !== 'All Languages') qualifiers.push(`language:${filters.language}`);
+  if (filters.language && filters.language !== 'All Languages') qualifiers.push(`language:${JSON.stringify(filters.language)}`);
   if (filters.license) qualifiers.push(`license:${filters.license}`);
   if (filters.isArchived !== undefined) qualifiers.push(`archived:${filters.isArchived}`);
 
   // 3. Range Qualifiers
-  if (filters.minStars || filters.maxStars) {
-    const min = filters.minStars || 0;
-    const max = filters.maxStars ? filters.maxStars : '*';
+  if (filters.minStars !== undefined || filters.maxStars !== undefined) {
+    const min = filters.minStars ?? 0;
+    const max = filters.maxStars ?? '*';
     qualifiers.push(`stars:${min}..${max}`);
   }
 
-  if (filters.minForks || filters.maxForks) {
-    const min = filters.minForks || 0;
-    const max = filters.maxForks ? filters.maxForks : '*';
+  if (filters.minForks !== undefined || filters.maxForks !== undefined) {
+    const min = filters.minForks ?? 0;
+    const max = filters.maxForks ?? '*';
     qualifiers.push(`forks:${min}..${max}`);
   }
+
+  if (filters.createdAfter) qualifiers.push(`created:>=${filters.createdAfter}`);
+  if (filters.updatedAfter) qualifiers.push(`pushed:>=${filters.updatedAfter}`);
 
   // 4. Topic Qualifiers
   if (filters.topics && filters.topics.length > 0) {
@@ -71,7 +72,7 @@ function mapGitHubRepoToInternal(repo: GitHubRepository): RepositoryWithStats {
     owner_avatar_url: repo.owner.avatar_url,
     description: repo.description,
     language: repo.language,
-    topics: repo.topics,
+    topics: repo.topics ?? [],
     stars_count: repo.stargazers_count,
     forks_count: repo.forks_count,
     issues_count: repo.open_issues_count,
@@ -87,12 +88,15 @@ function mapGitHubRepoToInternal(repo: GitHubRepository): RepositoryWithStats {
 /**
  * Executes a repository search against the GitHub API.
  */
-export async function searchRepositories(
+export async function searchGitHubRepositories(
   filters: SearchFilters,
   sort: SortOption = 'best-match',
   page: number = 1,
   perPage: number = 30
-): Promise<PaginatedResult<RepositoryWithStats>> {
+): Promise<PaginatedResult<GitHubRepository>> {
+  if (!Number.isInteger(page) || !Number.isInteger(perPage) || page < 1 || perPage < 1 || perPage > 100 || page * perPage > 1000) {
+    throw new RangeError('Search pagination must stay within the first 1000 results.');
+  }
   const q = buildQueryString(filters);
   const { sort: githubSort, order } = getSortParams(sort);
   
@@ -110,9 +114,16 @@ export async function searchRepositories(
   const data = await fetchGitHub<GitHubSearchResponse<GitHubRepository>>(endpoint);
 
   return {
-    items: data.items.map(mapGitHubRepoToInternal),
+    items: data.items,
     totalCount: data.total_count,
     // GitHub limits search pagination to the first 1000 results
     hasMore: data.items.length === perPage && (page * perPage) < Math.min(data.total_count, 1000),
   };
+}
+
+export async function searchRepositories(
+  filters: SearchFilters, sort: SortOption = 'best-match', page = 1, perPage = 30
+): Promise<PaginatedResult<RepositoryWithStats>> {
+  const data = await searchGitHubRepositories(filters, sort, page, perPage);
+  return { ...data, items: data.items.map(mapGitHubRepoToInternal) };
 }
