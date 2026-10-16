@@ -38,8 +38,7 @@ export interface RepositorySnapshot {
 }
 
 /**
- * Represents the calculated trending statistics from our Materialized View.
- * Maps to `repository_stats_mv`.
+ * Represents trending statistics calculated from repository snapshots.
  */
 export interface RepositoryStats {
   repository_id: string;
@@ -51,5 +50,14 @@ export interface RepositoryStats {
 /**
  * A combined type used for displaying a repository card in the UI,
  * merging base data with its calculated trending stats.
+ *
+ * `is_hidden_gem` is computed at runtime by the analytics layer (see
+ * `lib/analytics.ts`) and is intentionally optional so callers that load
+ * from the GitHub API directly (without snapshots) don't have to fabricate
+ * a value.
  */
-export type RepositoryWithStats = Repository & Partial<RepositoryStats>;
+export type RepositoryWithStats = Repository &
+  Partial<RepositoryStats> & {
+    is_hidden_gem?: boolean;
+    is_sample?: boolean;
+  };

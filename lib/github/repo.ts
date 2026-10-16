@@ -1,47 +1,35 @@
 import 'server-only';
-import { GitHubRepository } from './types';
+import { fetchGitHub, fetchGitHubResponse, GitHubApiError } from './client';
+import { GitHubRepository, GitHubRelease } from './types';
 
-// Helper to make authenticated requests with caching
-async function fetchWithAuth(url: string, acceptHeader?: string) {
-  const headers: HeadersInit = {};
-  
-  if (process.env.GITHUB_TOKEN) {
-    headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
-  }
-  if (acceptHeader) {
-    headers['Accept'] = acceptHeader;
-  }
-
-  return fetch(url, {
-    headers,
-    // Cache for 1 hour to keep the page fast and avoid rate limits
-    next: { revalidate: 3600 }, 
-  });
+function repoPath(owner: string, name: string) {
+  return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 }
 
 export async function getRepository(owner: string, name: string): Promise<GitHubRepository | null> {
-  const res = await fetchWithAuth(`https://api.github.com/repos/${owner}/${name}`);
-  
-  if (res.status === 404) return null; // Not found, deleted, or private
-  if (res.status === 403 || res.status === 429) throw new Error('RATE_LIMIT');
-  if (!res.ok) throw new Error('API_ERROR');
-  
-  return res.json();
+  try {
+    return await fetchGitHub<GitHubRepository>(repoPath(owner, name), { next: { revalidate: 3600 } });
+  } catch (error) {
+    if (error instanceof GitHubApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function getRepositoryReadme(owner: string, name: string): Promise<string | null> {
-  // 'application/vnd.github.v3.html' tells GitHub to return raw HTML instead of Markdown
-  const res = await fetchWithAuth(
-    `https://api.github.com/repos/${owner}/${name}/readme`,
-    'application/vnd.github.v3.html'
-  );
-
-  if (!res.ok) return null;
-  return res.text();
+  try {
+    const response = await fetchGitHubResponse(`${repoPath(owner, name)}/readme`, {
+      headers: { Accept: 'application/vnd.github.html+json' }, next: { revalidate: 3600 },
+    });
+    return await response.text();
+  } catch {
+    return null;
+  }
 }
 
-export async function getLatestRelease(owner: string, name: string) {
-  const res = await fetchWithAuth(`https://api.github.com/repos/${owner}/${name}/releases/latest`);
-  if (!res.ok) return null;
-  return res.json();
+export async function getLatestRelease(owner: string, name: string): Promise<GitHubRelease | null> {
+  try {
+    return await fetchGitHub<GitHubRelease>(`${repoPath(owner, name)}/releases/latest`, { next: { revalidate: 3600 } });
+  } catch {
+    return null;
+  }
 }

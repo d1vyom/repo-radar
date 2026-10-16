@@ -1,6 +1,11 @@
 import { classifyRepository } from '../lib/classification/engine';
 
 describe('Deterministic Domain Classifier', () => {
+  it('does not classify fragments inside unrelated words', () => {
+    expect(classifyRepository('Maintain a gptimer driver', [], 'C')).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ domainSlug: 'ai' })])
+    );
+  });
   it('should correctly classify a Web3/Blockchain repository', () => {
     const description = 'A decentralized smart contract protocol for Ethereum.';
     const topics = ['web3', 'solidity', 'crypto'];

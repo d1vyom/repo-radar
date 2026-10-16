@@ -6,14 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:e2e": "node scripts/test-e2e.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.3",
+    "@supabase/supabase-js": "2.112.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.31.0",
-    "next": "14.2.35",
+    "next": "15.5.28",
     "nuqs": "^2.9.5",
     "react": "^18",
     "react-dom": "^18",
@@ -23,6 +27,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/typography": "^0.5.20",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
@@ -30,14 +35,21 @@
     "@types/react-dom": "^18",
     "@types/sanitize-html": "^2.16.1",
     "eslint": "^8",
-    "eslint-config-next": "14.2.35",
+    "eslint-config-next": "15.5.28",
     "eslint-config-prettier": "^10.1.8",
     "jest": "^30.4.2",
-    "postcss": "^8",
+    "postcss": "^8.5.30",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.4.12",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "$postcss",
+    "postcss-selector-parser": "^7.1.6"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
